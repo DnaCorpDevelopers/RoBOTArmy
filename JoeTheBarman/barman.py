@@ -59,7 +59,7 @@ class Barman:
 
         if 'drinks' in tokens:
             # return the list of drinks
-            return 'Abbiamo ' + ', '.join(self.drinks.values()), None
+            return 'Abbiamo ' + ', '.join([d['name'] for d in self.drinks]), None
 
         if len(foundDrinks) < 1:
             # if we haven't found a valid drink
