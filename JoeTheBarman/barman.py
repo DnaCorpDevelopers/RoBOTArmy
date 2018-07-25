@@ -13,10 +13,15 @@ class Barman:
         self.channel = client.get_channel('467294663032963102')
         self.drinks = initialDrinkList
 
+        self.orders = {}
+
+        self.customers = set()
+
     def addDrink(self, drink):
         self.drinks[drink.lower()] = drink
 
-    def greetings(self):
+    def register(self, user):
+        self.customers.add(user)
         return random.choice(greetings)
 
     def checkMessage(self, message):
@@ -30,8 +35,8 @@ class Barman:
 
         content = message.content.lower()
 
-        # must contain 'joe' or 'barman'
-        if any(x in content for x in names):
+        # must contain 'joe' or 'barman' or be in the watching list
+        if any(x in content for x in names) or message.author in self.customers:
             return True
 
         return False
