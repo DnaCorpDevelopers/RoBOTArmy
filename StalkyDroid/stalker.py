@@ -1,6 +1,9 @@
 import asyncio
 import json
 import os.path
+import traceback
+
+from StalkyDroid.webscraper import WebScraper
 from contextlib import suppress
 
 from datetime import datetime
@@ -21,7 +24,8 @@ class Stalker(object):
         self.user = client.user
 
         # async config
-        self.time = 10  # seconds
+        # todo: this should be in config and changeable with commands
+        self.time = 300  # seconds
         self.is_started = False
         self._task = None
 
@@ -132,7 +136,26 @@ class Stalker(object):
 
         await self.client.send_message(message.channel, response)
 
+    async def webScraper(self):
+        try:
+            ws = WebScraper()
+            messages = await ws.scrape()
+        except Exception as e:
+            # if we have any kind of error with the remote site, call for help!
+            print(e)
+            traceback.print_exc()
+            await self.client.send_message('@everyone _O-oh..._')
+            await self.stop()
+            return
+
+        # ...else lets explore the results
+        for member, posts in messages.items():
+            print(member, posts)
+
     async def bipTime(self):
+        """
+        Just a debug function that print the current date and time
+        """
         now = datetime.now()
         for idx in self.getChannels():
             channel = self.client.get_channel(idx)
@@ -141,6 +164,9 @@ class Stalker(object):
             await self.client.send_message(channel, msg)
 
     async def start(self):
+        """
+        Start or restart the execution.
+        """
         if not self.is_started:
             self.is_started = True
             print('starting...')
@@ -148,6 +174,9 @@ class Stalker(object):
             self._task = asyncio.ensure_future(self._run())
 
     async def stop(self):
+        """
+        Stop the execution, if it is running.
+        """
         if self.is_started:
             print('stopping...')
             self.is_started = False
@@ -157,7 +186,12 @@ class Stalker(object):
                 await self._task
 
     async def _run(self):
+        """
+        Execute the current function.
+        :return:
+        """
         while True:
             print('exec...')
-            await self.bipTime()
+            # await self.bipTime()
+            await self.webScraper()
             await asyncio.sleep(self.time)
