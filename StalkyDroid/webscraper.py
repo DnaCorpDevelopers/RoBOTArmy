@@ -19,8 +19,8 @@ class WebScraper(object):
         super().__init__()
 
         self.config = {}
-        self.limit = 5  # todo: increase
-        self.waiting = 10  # seconds between searches
+        self.limit = 2  # todo: increase
+        self.waiting = 1 # todo: put something like 10 or 20  # seconds between searches
 
         with open(resourceDir + 'urls.config') as f:
             content = [line.split('=', 1) for line in f.readlines()]
@@ -34,9 +34,13 @@ class WebScraper(object):
         loop = asyncio.get_event_loop()
 
         messages = {}
+        count = 0
 
         # for each member...
         for member in self.config['members']:
+            if member.startswith('#'):
+                continue
+
             print('Scraping ', member)
 
             messages[member] = {'posts': []}
@@ -78,6 +82,8 @@ class WebScraper(object):
                 anchorPost = postContent.find('a', {'name': postId})
                 postRow = anchorPost.parent.parent.parent
 
+                count += 1
+
                 messages[member]['posts'].append({
                     'postId': postId,
                     'postUrl': postUrl,
@@ -86,5 +92,7 @@ class WebScraper(object):
                 })
 
             await asyncio.sleep(self.waiting)
+
+        print('total messages: ', count)
 
         return messages

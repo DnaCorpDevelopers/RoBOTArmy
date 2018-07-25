@@ -7,7 +7,7 @@ from StalkyDroid.webscraper import WebScraper
 from contextlib import suppress
 
 from datetime import datetime
-from discord import Client, Message
+from discord import Client, Message, Embed
 
 envConfig = 'StalkyDroid/resources/environment.config'
 
@@ -140,6 +140,30 @@ class Stalker(object):
         try:
             ws = WebScraper()
             messages = await ws.scrape()
+
+            with open('out.json', 'w+') as f:
+                f.write(str(messages))
+
+            # ...else lets explore the results
+            for member, posts in messages.items():
+
+                for post in posts:
+                    print(post)
+
+                    embed = Embed(title='New post from ' + member)
+                    embed.add_field(name='Author', value=member, inline=False)
+                    embed.add_field(name='Link', value=post['postUrl'], inline=False)
+                    embed.add_field(name='Content', value=post['postbody'], inline=False)
+
+                    print(member, post)
+
+                    for channel in self.getChannels():
+                        try:
+                            await self.client.send_message(channel, embed=embed)
+                        except Exception as e:
+                            print(e)
+                            traceback.print_exc()
+
         except Exception as e:
             # if we have any kind of error with the remote site, call for help!
             print(e)
@@ -147,10 +171,6 @@ class Stalker(object):
             await self.client.send_message('@everyone _O-oh..._')
             await self.stop()
             return
-
-        # ...else lets explore the results
-        for member, posts in messages.items():
-            print(member, posts)
 
     async def bipTime(self):
         """
