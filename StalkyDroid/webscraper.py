@@ -1,4 +1,5 @@
 import asyncio
+import re
 
 import requests
 from bs4 import BeautifulSoup
@@ -20,7 +21,7 @@ class WebScraper(object):
 
         self.config = {}
         self.limit = 2  # todo: increase
-        self.waiting = 1 # todo: put something like 10 or 20  # seconds between searches
+        self.waiting = 1  # todo: put something like 10 or 20  # seconds between searches
 
         with open(resourceDir + 'urls.config') as f:
             content = [line.split('=', 1) for line in f.readlines()]
@@ -43,7 +44,7 @@ class WebScraper(object):
 
             print('Scraping ', member)
 
-            messages[member] = {'posts': []}
+            messages[member] = []
 
             search = self.config['SEARCH'] + member
             site = self.config['ROOT']
@@ -84,15 +85,29 @@ class WebScraper(object):
 
                 count += 1
 
-                messages[member]['posts'].append({
-                    'postId': postId,
-                    'postUrl': postUrl,
-                    'postbody': postRow.find_all('span', {'class': 'postbody'}),
-                    'postdetails': postRow.find_all('span', {'class': 'postdetails'})
+                postdetail = postRow.find_all('span', {'class': 'postdetails'})[1]
+                x = re.findall('Posted: (.+)Post subject: (.+)', postdetail.text)[0]
+
+                postbody = postRow.find_all(['span', 'td'], {'class': ['postbody', 'genmed', 'quote']})
+                chunks = [
+                    {
+                        'type': x['class'][0],
+                        'text': x.getText().rstrip()
+                    }
+                    for x in postbody
+                    if x.getText().rstrip() != ''
+                ]
+
+                messages[member].append({
+                    'id': postId,
+                    'url': postUrl,
+                    'date': x[0].rstrip(),  # publication date
+                    'title': x[1].rstrip(),  # topic title
+                    'body': chunks,
                 })
 
-            await asyncio.sleep(self.waiting)
+                await asyncio.sleep(self.waiting)
 
-        print('total messages: ', count)
+                print('total messages: ', count)
 
         return messages

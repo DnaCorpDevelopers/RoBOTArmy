@@ -141,25 +141,40 @@ class Stalker(object):
             ws = WebScraper()
             messages = await ws.scrape()
 
-            with open('out.json', 'w+') as f:
-                f.write(str(messages))
-
             # ...else lets explore the results
             for member, posts in messages.items():
 
                 for post in posts:
-                    print(post)
 
-                    embed = Embed(title='New post from ' + member)
+                    embed = Embed(title=post['title'])
                     embed.add_field(name='Author', value=member, inline=False)
-                    embed.add_field(name='Link', value=post['postUrl'], inline=False)
-                    embed.add_field(name='Content', value=post['postbody'], inline=False)
 
-                    print(member, post)
+                    values = []
+                    for field in post['body']:
+                        type = field['type']
+                        text = field['text']
 
-                    for channel in self.getChannels():
+                        if type == 'genmed':
+                            values.append('**' + text + '**')
+                        if type == 'quote':
+                            values.append('_' + text + '_')
+                        if type == 'postbody':
+                            values.append(text.replace('"', "'"))
+
+                    embed.add_field(name='Post', value="\n".join(values), inline=False)
+                    embed.add_field(name='Link', value=post['url'], inline=False)
+
+                    for f in embed.fields:
+                        print(f)
+                        # with open('test.txt', 'a') as x:
+                        #     x.write(str(f))
+
+                    print('------------------------')
+
+                    for idx in self.getChannels():
                         try:
-                            await self.client.send_message(channel, embed=embed)
+                            channel = self.client.get_channel(idx)
+                            await self.client.send_message(channel, 'BIP!', embed=embed)
                         except Exception as e:
                             print(e)
                             traceback.print_exc()
