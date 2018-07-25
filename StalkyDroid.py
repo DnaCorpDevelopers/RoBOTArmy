@@ -1,8 +1,16 @@
+import asyncio
+
 from discord import Client
 
 from StalkyDroid.stalker import Stalker
 
 stalker = None
+
+
+async def _run():
+    for i in range(5):
+        await stalker.bipTime()
+        await asyncio.sleep(5)
 
 
 def main():
@@ -16,9 +24,7 @@ def main():
         if not stalker.checkMessage(message):
             return
 
-        response = stalker.executeCommand(message)
-
-        await client.send_message(message.channel, response)
+        await stalker.executeCommand(message)
 
     @client.event
     async def on_ready():
@@ -29,12 +35,14 @@ def main():
         global stalker
         stalker = Stalker(client)
 
-        print('Available channels:')
+        print('Anchored channels:')
         for _id in stalker.getChannels():
             channel = client.get_channel(_id)
             print('+ ', channel.name, channel.id)
 
         # await client.send_message(channel, "_Bip... bip... bip..._")
+
+        await stalker.start()
 
     client.run(token)
 
