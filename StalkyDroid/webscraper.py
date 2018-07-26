@@ -20,7 +20,7 @@ class WebScraper(object):
         super().__init__()
 
         self.config = {}
-        self.limit = 2  # todo: increase
+        self.limit = 5  # todo: increase
         self.waiting = 1  # todo: put something like 10 or 20  # seconds between searches
 
         with open(resourceDir + 'urls.config') as f:
@@ -86,7 +86,12 @@ class WebScraper(object):
                 count += 1
 
                 postdetail = postRow.find_all('span', {'class': 'postdetails'})[1]
-                x = re.findall('Posted: (.+)Post subject: (.+)', postdetail.text)[0]
+
+                pdRxDate = re.findall('Posted: (.+)Post subject:.*', postdetail.text)
+                pdRxTitle = re.findall('.*Post subject: (.+)', postdetail.text)
+
+                pdDate = pdRxDate[0][0] if len(pdRxDate) > 0 else ''
+                pdTitle = pdRxTitle[0][0] if len(pdRxTitle) > 0 else ''
 
                 postbody = postRow.find_all(['span', 'td'], {'class': ['postbody', 'genmed', 'quote']})
                 chunks = [
@@ -101,13 +106,13 @@ class WebScraper(object):
                 messages[member].append({
                     'id': postId,
                     'url': postUrl,
-                    'date': x[0].rstrip(),  # publication date
-                    'title': x[1].rstrip(),  # topic title
+                    'date': pdDate.rstrip(),  # publication date
+                    'title': pdTitle.rstrip(),  # topic title
                     'body': chunks,
                 })
 
                 await asyncio.sleep(self.waiting)
 
-                print('total messages: ', count)
+        print('total messages: ', count)
 
         return messages

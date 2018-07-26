@@ -150,7 +150,9 @@ class Stalker(object):
                     embed.add_field(name='Author', value=member, inline=False)
 
                     values = []
-                    for field in post['body']:
+
+                    for i in range(min(20, len(post['body']))):
+                        field = post['body'][i]
                         type = field['type']
                         text = field['text']
 
@@ -161,15 +163,13 @@ class Stalker(object):
                         if type == 'postbody':
                             values.append(text.replace('"', "'"))
 
+                    if len(post['body']) > 20:
+                        embed.add_field(name='_Truncated message_',
+                                        value='Check the link for the whole message',
+                                        inline=False)
+
                     embed.add_field(name='Post', value="\n".join(values), inline=False)
                     embed.add_field(name='Link', value=post['url'], inline=False)
-
-                    for f in embed.fields:
-                        print(f)
-                        # with open('test.txt', 'a') as x:
-                        #     x.write(str(f))
-
-                    print('------------------------')
 
                     for idx in self.getChannels():
                         try:
