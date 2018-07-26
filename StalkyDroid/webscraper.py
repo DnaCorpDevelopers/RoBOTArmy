@@ -7,11 +7,77 @@ from bs4 import BeautifulSoup
 resourceDir = 'StalkyDroid/resources/'
 
 
-async def getRequest(loop, search):
-    searchFut = loop.run_in_executor(None, requests.get, search)
-    searchRes = await searchFut
-    searchContent = BeautifulSoup(searchRes.content, 'html5lib')
-    return searchContent
+def getLoop():
+    """
+    :return: the current asyncio loop
+    """
+    return asyncio.get_event_loop()
+
+
+async def getRequest(url: str):
+    """
+    :param url: destination url
+    :return: the content of the request
+    """
+    future = getLoop().run_in_executor(None, requests.get, url)
+    results = await future
+    content = BeautifulSoup(results.content, 'html5lib')
+    return content
+
+
+def topicInfo(topic: BeautifulSoup):
+    """
+    Parse a topic block and extract its id and title.
+    :param topic: input code block
+    :return: a dictionary composed by id and title of the topic
+    """
+    return {
+        'id': topic['href'].split('=')[1],
+        'title': topic.getText()
+    }
+
+
+def parsePost(block: BeautifulSoup):
+    """
+    Parse the input block and extract all the information regarding a post
+    :param block: input code block
+    :return: an dictionary representing a post
+    """
+    post = block.parent.parent
+    postId = [a for a in post.findAll('a') if a.has_attr('name')][0]['name']
+
+    postBody = post.find_all(['span', 'td'], {'class': ['postbody', 'genmed', 'quote']})
+    postDetails = post.find_all('span', {'class': 'postdetails'})
+
+    publicationDate = re.findall('Posted: (.+)Post subject:.*', postDetails[1].getText())[0]
+
+    chunks = []
+
+    for pb in postBody:
+        text = pb.getText().strip()
+        if text == '':
+            continue
+
+        chunk = {
+            'type': pb.attrs['class'],
+            'text': text,
+            'images': [],
+            'links': []
+        }
+
+        for img in pb.findAll('img'):
+            chunk['images'].append(img['src'])
+
+        for a in pb.findAll('a', {'class': 'postlink'}):
+            chunk['links'].append(a['src'])
+
+        chunks.append(chunk)
+
+    return {
+        'id': postId,
+        'date': publicationDate,
+        'chunks': chunks
+    }
 
 
 class WebScraper(object):
@@ -20,8 +86,7 @@ class WebScraper(object):
         super().__init__()
 
         self.config = {}
-        self.limit = 5  # todo: increase
-        self.waiting = 1  # todo: put something like 10 or 20  # seconds between searches
+        self.waiting = 2  # todo: put something like 10 or 20  # seconds between searches
 
         with open(resourceDir + 'urls.config') as f:
             content = [line.split('=', 1) for line in f.readlines()]
@@ -31,88 +96,42 @@ class WebScraper(object):
         with open(resourceDir + 'members.txt') as f:
             self.config['members'] = [line.strip() for line in f.readlines()]
 
-    async def scrape(self):
-        loop = asyncio.get_event_loop()
+    async def scrapeIndex(self):
+        content = await getRequest(
+            self.config['URL_ROOT'] +
+            self.config['URL_FORUM'] +
+            self.config['FORUM_X4']
+        )
 
-        messages = {}
-        count = 0
+        topicsList = content.findAll('a', {'class': 'topictitle'})
+        topics = [topicInfo(t) for t in topicsList]
 
-        # for each member...
-        for member in self.config['members']:
-            if member.startswith('#'):
-                continue
+        return topics
 
-            print('Scraping ', member)
+    async def scrapeTopic(self, topicId):
 
-            messages[member] = []
+        posts = []
 
-            search = self.config['SEARCH'] + member
-            site = self.config['ROOT']
+        for start in range(0, 300, 15):
+            content = await getRequest(
+                self.config['URL_ROOT'] +
+                self.config['URL_TOPIC'] +
+                topicId + "&start=" + start
+            )
 
-            print(search)
+            if 'General Error' in content.getText():
+                break
 
-            searchContent = await getRequest(loop, search)
+            for block in content.findAll('span', {'class': 'name'}):
+                name = block.getText().strip()
+                if name in self.config['members']:
+                    print('found post from ', name)
 
-            posts = []
-            searchPages = []
+                    post = parsePost(block)
+                    post['author'] = name
 
-            # ...run a search...
-            for a in searchContent.find_all('a'):
-                if a.has_attr('href'):
-                    href = a['href']
-                    if 'p=' in href:
-                        posts.append(href)
-                    if 'search_id=' in href:
-                        searchPages.append(href)
+                    posts.append(post)
 
-            print('found ', len(posts), ' posts')
-            print('found ', len(searchPages), ' search pages')
+            asyncio.sleep(self.waiting)
 
-            # ... and extract all the posts...
-            for i in range(min(self.limit, len(posts))):
-                # todo: add a check from the last posts ids
-
-                post = posts[i]
-                postUrl = site + post
-
-                postContent = await getRequest(loop, postUrl)
-                postId = post.split('#')[1]
-
-                print('get post #', postId)
-
-                anchorPost = postContent.find('a', {'name': postId})
-                postRow = anchorPost.parent.parent.parent
-
-                count += 1
-
-                postdetail = postRow.find_all('span', {'class': 'postdetails'})[1]
-
-                pdRxDate = re.findall('Posted: (.+)Post subject:.*', postdetail.text)
-                pdRxTitle = re.findall('.*Post subject: (.+)', postdetail.text)
-
-                pdDate = pdRxDate[0][0] if len(pdRxDate) > 0 else ''
-                pdTitle = pdRxTitle[0][0] if len(pdRxTitle) > 0 else ''
-
-                postbody = postRow.find_all(['span', 'td'], {'class': ['postbody', 'genmed', 'quote']})
-                chunks = [
-                    {
-                        'type': x['class'][0],
-                        'text': x.getText().rstrip()
-                    }
-                    for x in postbody
-                    if x.getText().rstrip() != ''
-                ]
-
-                messages[member].append({
-                    'id': postId,
-                    'url': postUrl,
-                    'date': pdDate.rstrip(),  # publication date
-                    'title': pdTitle.rstrip(),  # topic title
-                    'body': chunks,
-                })
-
-                await asyncio.sleep(self.waiting)
-
-        print('total messages: ', count)
-
-        return messages
+        return posts
