@@ -33,7 +33,8 @@ def topicInfo(topic: BeautifulSoup):
     """
     return {
         'id': topic['href'].split('=')[1],
-        'title': topic.getText()
+        'title': topic.getText(),
+        'posts': int(topic.parent.parent.parent.find('span', {'class', 'postdetails'}).getText())
     }
 
 
@@ -69,7 +70,7 @@ def parsePost(block: BeautifulSoup):
             chunk['images'].append(img['src'])
 
         for a in pb.findAll('a', {'class': 'postlink'}):
-            chunk['links'].append(a['src'])
+            chunk['links'].append(a['href'])
 
         chunks.append(chunk)
 
@@ -86,7 +87,7 @@ class WebScraper(object):
         super().__init__()
 
         self.config = {}
-        self.waiting = 2  # todo: put something like 10 or 20  # seconds between searches
+        self.waiting = 2
 
         with open(resourceDir + 'urls.config') as f:
             content = [line.split('=', 1) for line in f.readlines()]
@@ -97,6 +98,7 @@ class WebScraper(object):
             self.config['members'] = [line.strip() for line in f.readlines()]
 
     async def scrapeIndex(self):
+        print(self.config)
         content = await getRequest(
             self.config['URL_ROOT'] +
             self.config['URL_FORUM'] +
@@ -108,7 +110,7 @@ class WebScraper(object):
 
         return topics
 
-    async def scrapeTopic(self, topicId):
+    async def scrapeTopic(self, topic):
 
         posts = []
 
@@ -116,7 +118,7 @@ class WebScraper(object):
             content = await getRequest(
                 self.config['URL_ROOT'] +
                 self.config['URL_TOPIC'] +
-                topicId + "&start=" + start
+                topic['id'] + "&start=" + str(start)
             )
 
             if 'General Error' in content.getText():

@@ -10,6 +10,7 @@ from datetime import datetime
 from discord import Client, Message, Embed
 
 envConfig = 'StalkyDroid/resources/environment.config'
+envChecked = 'StalkyDroid/resources/checked.json'
 
 
 class Stalker(object):
@@ -34,6 +35,9 @@ class Stalker(object):
                 self.config = json.load(f)
         else:
             self.config = {'channel_ids': []}
+
+        with open(envChecked, 'r') as f:
+            self.checked = json.load(f)
 
     def updateConfig(self, key: str, value):
         """
@@ -99,6 +103,35 @@ class Stalker(object):
 
         return False
 
+    def checkTopic(self, topic):
+        """
+        Check if in the given topic there are new posts.
+        :param topic: topic to check
+        :return: True if the topic is checked, otherwise False
+        """
+        if topic['id'] in self.checked:
+            if topic['posts'] <= self.checked[topic['id']]['posts']:
+                # topic already checked in toto
+                return True
+
+        return False
+
+    def checkPost(self, topic, post):
+        if topic['id'] not in self.checked:
+            return False
+        return post['id'] in self.checked[topic['id']]['list']
+
+    def updateTopic(self, topic, pid):
+        tid = topic['id']
+
+        if tid not in self.checked:
+            self.checked[tid] = {
+                'posts': topic['posts'],
+                'list': []
+            }
+
+        self.checked[tid]['list'].append(pid)
+
     async def executeCommand(self, message: Message):
         """
         If the message contains a valid command, executes it.
@@ -139,45 +172,62 @@ class Stalker(object):
     async def webScraper(self):
         try:
             ws = WebScraper()
-            messages = await ws.scrape()
+            topics = await ws.scrapeIndex()
 
-            # ...else lets explore the results
-            for member, posts in messages.items():
+            for topic in topics:
+
+                if self.checkTopic(topic):
+                    # this topic has no news
+                    continue
+
+                print(topic)
+                posts = await ws.scrapeTopic(topic)
 
                 for post in posts:
+                    if self.checkPost(topic, post):
+                        # already done
+                        continue
 
-                    embed = Embed(title=post['title'])
-                    embed.add_field(name='Author', value=member, inline=False)
+                    # send all the messages!
 
-                    values = []
+                    # todo
+                    print(post)
 
-                    for i in range(min(20, len(post['body']))):
-                        field = post['body'][i]
-                        type = field['type']
-                        text = field['text']
+                    # register the posts
+                    self.updateTopic(topic, post['id'])
 
-                        if type == 'genmed':
-                            values.append('**' + text + '**')
-                        if type == 'quote':
-                            values.append('_' + text + '_')
-                        if type == 'postbody':
-                            values.append(text.replace('"', "'"))
-
-                    if len(post['body']) > 20:
-                        embed.add_field(name='_Truncated message_',
-                                        value='Check the link for the whole message',
-                                        inline=False)
-
-                    embed.add_field(name='Post', value="\n".join(values), inline=False)
-                    embed.add_field(name='Link', value=post['url'], inline=False)
-
-                    for idx in self.getChannels():
-                        try:
-                            channel = self.client.get_channel(idx)
-                            await self.client.send_message(channel, 'BIP!', embed=embed)
-                        except Exception as e:
-                            print(e)
-                            traceback.print_exc()
+                    # embed = Embed(title=post['title'])
+                    # embed.add_field(name='Author', value=member, inline=False)
+                    #
+                    # values = []
+                    #
+                    # for i in range(min(20, len(post['body']))):
+                    #     field = post['body'][i]
+                    #     type = field['type']
+                    #     text = field['text']
+                    #
+                    #     if type == 'genmed':
+                    #         values.append('**' + text + '**')
+                    #     if type == 'quote':
+                    #         values.append('_' + text + '_')
+                    #     if type == 'postbody':
+                    #         values.append(text.replace('"', "'"))
+                    #
+                    # if len(post['body']) > 20:
+                    #     embed.add_field(name='_Truncated message_',
+                    #                     value='Check the link for the whole message',
+                    #                     inline=False)
+                    #
+                    # embed.add_field(name='Post', value="\n".join(values), inline=False)
+                    # embed.add_field(name='Link', value=post['url'], inline=False)
+                    #
+                    # for idx in self.getChannels():
+                    #     try:
+                    #         channel = self.client.get_channel(idx)
+                    #         await self.client.send_message(channel, 'BIP!', embed=embed)
+                    #     except Exception as e:
+                    #         print(e)
+                    #         traceback.print_exc()
 
         except Exception as e:
             # if we have any kind of error with the remote site, call for help!
