@@ -2,6 +2,7 @@ import asyncio
 import json
 import os.path
 import traceback
+from pprint import pprint
 
 from StalkyDroid.webscraper import WebScraper
 from contextlib import suppress
@@ -11,6 +12,56 @@ from discord import Client, Message, Embed
 
 envConfig = 'StalkyDroid/resources/environment.config'
 envChecked = 'StalkyDroid/resources/checked.json'
+
+
+def buildEmbed(topic, post):
+    embed = Embed(title=topic['title'])
+    embed.add_field(name='Author', value=post['author'], inline=False)
+    embed.add_field(name='Date', value=post['date'], inline=False)
+    embed.add_field(name='Link', value=post['link'], inline=False)
+
+    values = []
+
+    chunks = post['chunks']
+    for i in range(min(20, len(chunks))):
+        _field = chunks[i]
+
+        _type = _field['type']
+        _text = _field['text']
+
+        pprint(_type)
+        pprint(_text)
+
+        if _type == 'genmed':
+            values.append('**' + _text + '**')
+        if _type == 'quote':
+            values.append('_' + _text + '_')
+        if _type == 'postbody':
+            values.append(_text.replace('"', "'"))
+
+    fullText = "\n".join(values)
+
+    truncated = False
+
+    if len(fullText) > 1024:
+        fullText = fullText[:1020] + '...'
+        truncated = True
+
+    if len(chunks) > 20:
+        truncated = True
+
+    embed.add_field(name='Post', value=fullText, inline=False)
+    if truncated:
+        embed.add_field(name='_Truncated message_',
+                        value='_Check the link for the whole message_',
+                        inline=False)
+
+    print('fields: ', len(embed.fields))
+
+    for field in embed.fields:
+        print(field.name, len(field.value))
+
+    return embed
 
 
 class Stalker(object):
@@ -132,6 +183,10 @@ class Stalker(object):
 
         self.checked[tid]['list'].append(pid)
 
+    def updateChecked(self):
+        with open(envChecked, 'w+') as f:
+            json.dump(f, self.checked)
+
     async def executeCommand(self, message: Message):
         """
         If the message contains a valid command, executes it.
@@ -173,6 +228,7 @@ class Stalker(object):
         try:
             ws = WebScraper()
             topics = await ws.scrapeIndex()
+            topics = sorted(topics, key=lambda x: -int(x['id']))
 
             for topic in topics:
 
@@ -182,6 +238,7 @@ class Stalker(object):
 
                 print(topic)
                 posts = await ws.scrapeTopic(topic)
+                posts = sorted(posts, key=lambda x: -int(x['id']))
 
                 for post in posts:
                     if self.checkPost(topic, post):
@@ -189,45 +246,18 @@ class Stalker(object):
                         continue
 
                     # send all the messages!
+                    embed = buildEmbed(topic, post)
 
-                    # todo
-                    print(post)
+                    for idx in self.getChannels():
+                        try:
+                            channel = self.client.get_channel(idx)
+                            await self.client.send_message(channel, 'BIP!', embed=embed)
 
-                    # register the posts
-                    self.updateTopic(topic, post['id'])
-
-                    # embed = Embed(title=post['title'])
-                    # embed.add_field(name='Author', value=member, inline=False)
-                    #
-                    # values = []
-                    #
-                    # for i in range(min(20, len(post['body']))):
-                    #     field = post['body'][i]
-                    #     type = field['type']
-                    #     text = field['text']
-                    #
-                    #     if type == 'genmed':
-                    #         values.append('**' + text + '**')
-                    #     if type == 'quote':
-                    #         values.append('_' + text + '_')
-                    #     if type == 'postbody':
-                    #         values.append(text.replace('"', "'"))
-                    #
-                    # if len(post['body']) > 20:
-                    #     embed.add_field(name='_Truncated message_',
-                    #                     value='Check the link for the whole message',
-                    #                     inline=False)
-                    #
-                    # embed.add_field(name='Post', value="\n".join(values), inline=False)
-                    # embed.add_field(name='Link', value=post['url'], inline=False)
-                    #
-                    # for idx in self.getChannels():
-                    #     try:
-                    #         channel = self.client.get_channel(idx)
-                    #         await self.client.send_message(channel, 'BIP!', embed=embed)
-                    #     except Exception as e:
-                    #         print(e)
-                    #         traceback.print_exc()
+                            # register the posts
+                            self.updateTopic(topic, post['id'])
+                        except Exception as e:
+                            print(e)
+                            traceback.print_exc()
 
         except Exception as e:
             # if we have any kind of error with the remote site, call for help!
@@ -236,6 +266,8 @@ class Stalker(object):
             await self.client.send_message('@everyone _O-oh..._')
             await self.stop()
             return
+
+        self.updateChecked()
 
     async def bipTime(self):
         """

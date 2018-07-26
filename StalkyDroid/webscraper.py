@@ -1,6 +1,6 @@
 import asyncio
 import re
-
+import itertools
 import requests
 from bs4 import BeautifulSoup
 
@@ -60,8 +60,8 @@ def parsePost(block: BeautifulSoup):
             continue
 
         chunk = {
-            'type': pb.attrs['class'],
-            'text': text,
+            'type': pb.attrs['class'][0],
+            'text': re.sub('\n+', '\n', text),
             'images': [],
             'links': []
         }
@@ -131,6 +131,11 @@ class WebScraper(object):
 
                     post = parsePost(block)
                     post['author'] = name
+                    post['link'] = (
+                        self.config['URL_ROOT'] +
+                        self.config['URL_POST'] +
+                        post['id'] + "#" + post['id']
+                    )
 
                     posts.append(post)
 
