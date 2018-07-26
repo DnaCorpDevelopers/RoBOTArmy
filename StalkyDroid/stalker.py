@@ -184,8 +184,9 @@ class Stalker(object):
         self.checked[tid]['list'].append(pid)
 
     def updateChecked(self):
+        pprint(self.checked)
         with open(envChecked, 'w+') as f:
-            json.dump(f, self.checked)
+            json.dump(self.checked, f)
 
     async def executeCommand(self, message: Message):
         """
