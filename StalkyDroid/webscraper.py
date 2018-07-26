@@ -1,8 +1,8 @@
 import asyncio
 import re
-import itertools
 import requests
 from bs4 import BeautifulSoup
+from random import randint
 
 resourceDir = 'StalkyDroid/resources/'
 
@@ -87,7 +87,7 @@ class WebScraper(object):
         super().__init__()
 
         self.config = {}
-        self.waiting = 2
+        self.waiting = randint(5, 20)
 
         with open(resourceDir + 'urls.config') as f:
             content = [line.split('=', 1) for line in f.readlines()]

@@ -77,7 +77,7 @@ class Stalker(object):
 
         # async config
         # todo: this should be in config and changeable with commands
-        self.time = 300  # seconds
+        self.time = 3600  # seconds
         self.is_started = False
         self._task = None
 
@@ -184,7 +184,8 @@ class Stalker(object):
         self.checked[tid]['list'].append(pid)
 
     def updateChecked(self):
-        pprint(self.checked)
+        print('update', str(datetime.now()))
+
         with open(envChecked, 'w+') as f:
             json.dump(self.checked, f)
 
@@ -222,6 +223,15 @@ class Stalker(object):
         if 'stop' in content:
             await self.stop()
             response = '_Sensors shutting down..._'
+
+        if 'frequency' in content:
+            try:
+                tokens = content.split(' ')
+                time = int(tokens[len(tokens) - 1])
+                self.time = max(time, 900)
+                response = '_New frequency: ' + str(self.time) + '_'
+            except ValueError:
+                response = '_Kzzzzzt! Invalid..._'
 
         await self.client.send_message(message.channel, response)
 
