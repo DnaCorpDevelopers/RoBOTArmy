@@ -37,7 +37,8 @@ def buildEmbed(topic, post):
         if _type == 'quote':
             values.append('_' + _text + '_')
         if _type == 'postbody':
-            values.append(_text.replace('"', "'"))
+            if '_________________' not in _text:
+                values.append(_text.replace('"', "'"))
 
     fullText = "\n".join(values)
 
@@ -76,8 +77,7 @@ class Stalker(object):
         self.user = client.user
 
         # async config
-        # todo: this should be in config and changeable with commands
-        self.time = 3600  # seconds
+        self.time = 3600  # seconds, hardcoded min is 15
         self.is_started = False
         self._task = None
 
@@ -167,6 +167,16 @@ class Stalker(object):
 
         return False
 
+    def topicStartReadFrom(self, topic):
+        if topic['id'] not in self.checked:
+            return 0
+
+        n = self.checked[topic['id']]['posts']
+
+        print('#{:8} +{:<4} {}'.format(topic['id'], (topic['posts'] - n), topic['title']))
+
+        return n - (n % 15)
+
     def checkPost(self, topic, post):
         if topic['id'] not in self.checked:
             return False
@@ -247,13 +257,15 @@ class Stalker(object):
                     # this topic has no news
                     continue
 
-                print(topic)
-                posts = await ws.scrapeTopic(topic)
+                page = self.topicStartReadFrom(topic)
+
+                posts = await ws.scrapeTopic(topic, page)
                 posts = sorted(posts, key=lambda x: -int(x['id']))
 
                 for post in posts:
                     if self.checkPost(topic, post):
                         # already done
+                        print('post from {} #{} already done'.format(post['author'], post['id']))
                         continue
 
                     # send all the messages!

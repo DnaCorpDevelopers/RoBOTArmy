@@ -87,7 +87,9 @@ class WebScraper(object):
         super().__init__()
 
         self.config = {}
-        self.waiting = randint(5, 20)
+        self.waiting = randint(10, 30)
+
+        print('current waiting: ', self.waiting)
 
         with open(resourceDir + 'urls.config') as f:
             content = [line.split('=', 1) for line in f.readlines()]
@@ -110,11 +112,11 @@ class WebScraper(object):
 
         return topics
 
-    async def scrapeTopic(self, topic):
+    async def scrapeTopic(self, topic, page=0):
 
         posts = []
 
-        for start in range(0, 300, 15):
+        for start in range(page, 300, 15):
             content = await getRequest(
                 self.config['URL_ROOT'] +
                 self.config['URL_TOPIC'] +
@@ -127,9 +129,10 @@ class WebScraper(object):
             for block in content.findAll('span', {'class': 'name'}):
                 name = block.getText().strip()
                 if name in self.config['members']:
-                    print('found post from ', name)
-
                     post = parsePost(block)
+
+                    print('found post from ', name, post['id'])
+
                     post['author'] = name
                     post['link'] = (
                         self.config['URL_ROOT'] +
