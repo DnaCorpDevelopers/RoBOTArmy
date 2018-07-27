@@ -21,9 +21,6 @@ def main():
 
     @client.event
     async def on_message(message):
-        if not stalker.checkMessage(message):
-            return
-
         await stalker.executeCommand(message)
 
     @client.event
@@ -39,8 +36,6 @@ def main():
         for _id in stalker.getChannels():
             channel = client.get_channel(_id)
             print('+ ', channel.name, channel.id)
-
-        # await client.send_message(channel, "_Bip... bip... bip..._")
 
         await stalker.start()
 

@@ -1,14 +1,14 @@
 import asyncio
 import json
-import os.path
 import traceback
+from contextlib import suppress
+from datetime import datetime
 from pprint import pprint
 
-from StalkyDroid.webscraper import WebScraper
-from contextlib import suppress
-
-from datetime import datetime
 from discord import Client, Message, Embed
+
+from BasicBot.basic import BasicBot
+from StalkyDroid.webscraper import WebScraper
 
 envConfig = 'StalkyDroid/resources/environment.config'
 envChecked = 'StalkyDroid/resources/checked.json'
@@ -65,94 +65,26 @@ def buildEmbed(topic, post):
     return embed
 
 
-class Stalker(object):
+class Stalker(BasicBot):
     """
     Source for async task: https://stackoverflow.com/a/37514633/1419058
     """
 
     def __init__(self, client: Client):
-        super().__init__()
-
-        self.client = client
-        self.user = client.user
+        super().__init__(client, envConfig)
 
         # async config
         self.time = 3600  # seconds, hardcoded min is 15
         self.is_started = False
         self._task = None
 
-        if os.path.isfile(envConfig):
-            with open(envConfig, 'r') as f:
-                self.config = json.load(f)
-        else:
-            self.config = {'channel_ids': []}
+        self.addCommand(self.commandStart, True)
+        self.addCommand(self.commandStop, True)
+        self.addCommand(self.commandChangeFrequency)
+        self.addCommand(self.commandOrder66)
 
         with open(envChecked, 'r') as f:
             self.checked = json.load(f)
-
-    def updateConfig(self, key: str, value):
-        """
-        Update generic configuration.
-        :param key: key in the configuration
-        :param value: new value
-        """
-
-        self.config[key] = value
-
-        with open(envConfig, 'w') as f:
-            json.dump(self.config, f)
-
-    def getChannels(self):
-        """
-        :return: all the channels where this bot is anchored
-        """
-        return self.config['channel_ids']
-
-    def addChannel(self, idx: str):
-        """
-        Add a channel id to the current channel list and update the configuration.
-        :param idx: channel id
-        """
-        channels = self.getChannels()
-        channels.append(idx)
-        self.updateConfig('channel_ids', channels)
-
-    def removeChannel(self, idx: str):
-        """
-        Remove a channel id from the current channel list and update the configuration.
-        :param idx: id to remove
-        """
-        channels = self.getChannels()
-        channels.remove(idx)
-        self.updateConfig('channel_ids', channels)
-
-    def checkMessage(self, message: Message):
-        """
-        Check if the message:
-        - is not from itself,
-        - it contains a mention to this bot,
-        - or, it is from an anchored channel.
-
-        :param message: input message
-        :return: True if the message is for this bot, otherwise False
-        """
-        # avoid self messages
-        if message.author == self.user:
-            return False
-
-        # it must contain a mention
-        for mention in message.mentions:
-            if mention.name == self.user.name:
-                return True
-
-        # if we have a channel
-        channels = self.getChannels()
-        if len(channels) > 0:
-            # avoid messages from not registered channels
-            if message.channel.id not in channels:
-                return False
-
-        return False
 
     def checkTopic(self, topic):
         """
@@ -168,6 +100,11 @@ class Stalker(object):
         return False
 
     def topicStartReadFrom(self, topic):
+        """
+        Compute the page index to start read from (because the old message are already parsed).
+        :param topic: input topic
+        :return: the page index to start from
+        """
         if topic['id'] not in self.checked:
             return 0
 
@@ -178,11 +115,22 @@ class Stalker(object):
         return n - (n % 15)
 
     def checkPost(self, topic, post):
+        """
+        Check if a post is already done or not.
+        :param topic: topic reference
+        :param post: post to check
+        :return: True if the post is already done, otherwise False
+        """
         if topic['id'] not in self.checked:
             return False
         return post['id'] in self.checked[topic['id']]['list']
 
     def updateTopic(self, topic, pid):
+        """
+        Update the internal topic list with the new parsed post id.
+        :param topic: topic reference
+        :param pid: id of a post
+        """
         tid = topic['id']
 
         if tid not in self.checked:
@@ -194,56 +142,49 @@ class Stalker(object):
         self.checked[tid]['list'].append(pid)
 
     def updateChecked(self):
+        """
+        Update the disk file with all the configuration data for the checked list.
+        """
         print('update', str(datetime.now()))
 
         with open(envChecked, 'w+') as f:
             json.dump(self.checked, f)
 
-    async def executeCommand(self, message: Message):
-        """
-        If the message contains a valid command, executes it.
-        Current valid messages:
-        - 'anchor' to register a channel
-        - 'leave' to leave a registered channel
-
-        :param message: the input message
-        :return: an answer in bot-language :D
-        """
-        content = message.content
-        channel = message.channel
-
-        response = '_...bip bip bip..._'
-
-        if 'anchor' in content:
-            self.addChannel(channel.id)
-
-            print('Anchored to ' + str(channel))
-            response = '_Anchored to_ #' + channel.name
-
-        if 'leave' in content:
-            self.removeChannel(channel.id)
-
-            print('Leaving ' + str(channel))
-            response = '_Bye!_'
-
-        if 'start' in content:
+    async def commandStart(self, msg: Message):
+        if self.containsMention(msg) and 'start' in msg.content:
+            print('start!')
             await self.start()
-            response = '_booting up sensors..._'
+            return '_booting up sensors..._'
 
-        if 'stop' in content:
+        return ''
+
+    async def commandStop(self, msg: Message):
+        if self.containsMention(msg) and 'stop' in msg.content:
+            print('stop!')
             await self.stop()
-            response = '_Sensors shutting down..._'
+            return '_Sensors shutting down..._'
 
-        if 'frequency' in content:
+        return ''
+
+    def commandChangeFrequency(self, msg: Message):
+        if self.containsMention(msg) and 'frequency' in msg.content:
             try:
-                tokens = content.split(' ')
+                tokens = msg.content.split(' ')
                 time = int(tokens[len(tokens) - 1])
                 self.time = max(time, 900)
                 response = '_New frequency: ' + str(self.time) + '_'
             except ValueError:
                 response = '_Kzzzzzt! Invalid..._'
 
-        await self.client.send_message(message.channel, response)
+            return response
+
+        return ''
+
+    def commandOrder66(self, msg: Message):
+        if self.containsMention(msg) and '66' in msg.content:
+            return '_ :skull: KILL ALL THE JEDI! :skull: _'
+
+        return ''
 
     async def webScraper(self):
         try:
@@ -327,11 +268,10 @@ class Stalker(object):
 
     async def _run(self):
         """
-        Execute the current function.
+        Execute the web scraping
         :return:
         """
         while True:
-            print('exec...')
-            # await self.bipTime()
             await self.webScraper()
+            # await self.bipTime()
             await asyncio.sleep(self.time)
