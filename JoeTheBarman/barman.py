@@ -5,7 +5,7 @@ from JoeTheBarman.languages.it.drinks import initialDrinkList
 from JoeTheBarman.languages.it.conversations import *
 
 
-class Barman:
+class Barman(object):
     def __init__(self, client):
         super().__init__()
 

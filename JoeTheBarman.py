@@ -6,7 +6,7 @@ barman = None
 
 
 def main():
-    with open('discord-bot-token.txt') as f:
+    with open('JoeTheBarman/discord-bot-token.txt') as f:
         token = f.read().rstrip()
 
     client = discord.Client()
