@@ -151,6 +151,11 @@ class Stalker(BasicBot):
             json.dump(self.checked, f)
 
     async def commandStart(self, msg: Message):
+        """
+        Start the current registered routine if it is not already started.
+        :param msg: must contain the 'start' keyword, and mention this bot
+        :return: a startup message, or an empty string if the command is invalid
+        """
         if self.containsMention(msg) and 'start' in msg.content:
             print('start!')
             await self.start()
@@ -159,6 +164,11 @@ class Stalker(BasicBot):
         return ''
 
     async def commandStop(self, msg: Message):
+        """
+        Stop the current registered routine if it is running.
+        :param msg: must contain the 'stop' keyword, and mention this bot
+        :return: a shutdown message, or an empty string if the command is invalid
+        """
         if self.containsMention(msg) and 'stop' in msg.content:
             print('stop!')
             await self.stop()
@@ -167,6 +177,13 @@ class Stalker(BasicBot):
         return ''
 
     def commandChangeFrequency(self, msg: Message):
+        """
+        Change the current update frequency. The input value is in seconds and has 900s (15min) as lower bound.
+        No upper bound is defined. Default value is 3600.
+        The previous interval must expire before the new one will be used.
+        :param msg: must contain the 'frequency' keyword, mention this bot, and have a valid number
+        :return: a message, or an empty string if the command is invalid
+        """
         if self.containsMention(msg) and 'frequency' in msg.content:
             try:
                 tokens = msg.content.split(' ')
@@ -181,12 +198,20 @@ class Stalker(BasicBot):
         return ''
 
     def commandOrder66(self, msg: Message):
+        """
+        Start the kill-all-jedi routine. Long live the Emperor!
+        :param msg: must contain the keyword '66', and mention this bot.
+        :return an easter egg message :)
+        """
         if self.containsMention(msg) and '66' in msg.content:
-            return '_ :skull: KILL ALL THE JEDI! :skull: _'
+            return '_ :skull: KILL ALL THE JEDIS! :skull: _'
 
         return ''
 
     async def webScraper(self):
+        """
+        Routine to perform the web scraping of the forum.
+        """
         try:
             ws = WebScraper()
             topics = await ws.scrapeIndex()
@@ -212,22 +237,20 @@ class Stalker(BasicBot):
                     # send all the messages!
                     embed = buildEmbed(topic, post)
 
-                    for idx in self.getChannels():
-                        try:
-                            channel = self.client.get_channel(idx)
-                            await self.client.send_message(channel, 'BIP!', embed=embed)
+                    try:
+                        await self.send('BIP!', embed=embed)
 
-                            # register the posts
-                            self.updateTopic(topic, post['id'])
-                        except Exception as e:
-                            print(e)
-                            traceback.print_exc()
+                        # register the posts
+                        self.updateTopic(topic, post['id'])
+                    except Exception as e:
+                        print(e)
+                        traceback.print_exc()
 
         except Exception as e:
             # if we have any kind of error with the remote site, call for help!
             print(e)
             traceback.print_exc()
-            await self.client.send_message('@everyone _O-oh..._')
+            await self.send('@everyone _O-oh..._')
             await self.stop()
             return
 
@@ -238,11 +261,9 @@ class Stalker(BasicBot):
         Just a debug function that print the current date and time
         """
         now = datetime.now()
-        for idx in self.getChannels():
-            channel = self.client.get_channel(idx)
-            msg = '...check: ' + str(now) + '...'
-            print('sending: ', msg)
-            await self.client.send_message(channel, msg)
+        msg = '...check: ' + str(now) + '...'
+        print('sending: ', msg)
+        await self.send(msg)
 
     async def start(self):
         """
@@ -275,3 +296,7 @@ class Stalker(BasicBot):
             await self.webScraper()
             # await self.bipTime()
             await asyncio.sleep(self.time)
+
+    async def login(self):
+        await super().login()
+        await self.start()

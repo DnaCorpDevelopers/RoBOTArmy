@@ -1,47 +1,45 @@
 import random
 import re
 
+from discord import Message, Client, User
+
+from BasicBot.basic import BasicBot
 from JoeTheBarman.languages.it.drinks import initialDrinkList
 from JoeTheBarman.languages.it.conversations import *
 
+envConfig = 'JoeTheBarman/resources/environment.config'
 
-class Barman(object):
-    def __init__(self, client):
-        super().__init__()
+
+class Barman(BasicBot):
+    def __init__(self, client: Client):
+        super().__init__(client, envConfig)
 
         self.user = client.user
-        self.channel = client.get_channel('467294663032963102')
         self.drinks = initialDrinkList
 
         self.orders = {}
 
         self.customers = set()
 
+        self.addCommand(self.serveDrinks)
+
     def addDrink(self, drink):
         self.drinks[drink.lower()] = drink
 
-    def register(self, user):
+    def register(self, user: User):
         self.customers.add(user)
         return random.choice(greetings)
 
-    def checkMessage(self, message):
-        # must be in the bar
-        if message.channel.id != self.channel.id:
-            return False
-
-        # must not anwer to itself
-        if message.author == self.user:
-            return False
-
+    def checkCall(self, message: Message):
         content = message.content.lower()
 
         # must contain 'joe' or 'barman' or be in the watching list
-        if any(x in content for x in names) or message.author in self.customers:
-            return True
+        return any(x in content for x in names) or message.author in self.customers
 
-        return False
+    def serveDrinks(self, message: Message):
+        if not self.checkCall(message):
+            return
 
-    def serveDrinks(self, message):
         mentions = message.mentions
 
         content = message.content
@@ -75,8 +73,8 @@ class Barman(object):
 
         if 'tutti' in tokens or message.mention_everyone:
             # if it is for @everyone or contains a special token
-            return '@everyone il prossimo giro di {2} lo offre {1} {0}!'\
-                .format(mention, title, foundDrink['name']), foundDrink['img']
+            return '@everyone il prossimo giro di {2} lo offre {1} {0}!' \
+                       .format(mention, title, foundDrink['name']), foundDrink['img']
 
         if len(mentions) > 0:
             # if we have mentions, notify to them
@@ -90,3 +88,7 @@ class Barman(object):
         conclusion = random.choice(conclusions)
 
         return intro + ' ' + drink + ' ' + conclusion, foundDrink['img']
+
+    async def login(self):
+        await super().login()
+        await self.send(random.choice(greetings)())

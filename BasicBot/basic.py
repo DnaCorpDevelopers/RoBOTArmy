@@ -22,6 +22,11 @@ class BasicBot(object):
         else:
             self.config = {'channel_ids': []}
 
+        print('Anchored channels:')
+        for _id in self.getChannels():
+            channel = client.get_channel(_id)
+            print('+ ', channel.name, channel.id)
+
     def updateConfig(self, key: str, value):
         """
         Update generic configuration.
@@ -62,6 +67,7 @@ class BasicBot(object):
         """
         Register a new command in this bot.
         :param command: the function to execute the command
+        :param async: if True the command will be execute as an async function, otherwise as synchronized.
         """
         if async:
             self.commandsAsync.append(command)
@@ -135,6 +141,23 @@ class BasicBot(object):
 
         return True
 
+    async def send(self, message: str, channel=None, embed=None):
+        """
+        Send a message through the client to all connected channels.
+        :param channel: specify the destination channel. If None, it will be sent to all anchored channels
+        :param message: the message to send
+        """
+        if channel is None:
+            for chid in self.getChannels():
+                await self.client.send_message(chid, message, embed=embed)
+        else:
+            await self.client.send_message(channel, message, embed=embed)
+
+    async def login(self):
+        print('Logged in as')
+        print(self.client.user.name)
+        print(self.client.user.id)
+
     async def executeCommand(self, message: Message):
         """
         If the message contains a valid command, executes it.
@@ -152,14 +175,14 @@ class BasicBot(object):
         for command in self.commandsSync:
             response = command(message)
             if response is not '':
-                await self.client.send_message(message.channel, response)
+                await self.send(response, message.channel)
                 return
 
         for command in self.commandsAsync:
             response = await command(message)
             if response is not '':
-                await self.client.send_message(message.channel, response)
+                await self.send(response, message.channel)
                 return
 
         if self.containsMention(message):
-            await self.client.send_message(message.channel, '_...bip bip bip..._')
+            await self.send('_...bip bip bip..._', message.channel)
