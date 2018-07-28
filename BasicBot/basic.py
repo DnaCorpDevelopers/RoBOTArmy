@@ -8,14 +8,23 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s : %(levelname)s : %(
 log = logging.getLogger('BasicBot')
 
 
+class Content(object):
+
+    def __init__(self, message=None, channel=None, embed=None) -> None:
+        super().__init__()
+        self.message = message
+        self.channel = channel
+        self.embed = embed
+
+
 class BasicBot(object):
 
     def __init__(self, client: Client, env) -> None:
         super().__init__()
 
         self.client = client
-        self.user = client.user
         self.env = env
+        self.user = None
 
         self.commandsSync = [self.anchorToChannel, self.leaveChannel]
         self.commandsAsync = []
@@ -25,11 +34,6 @@ class BasicBot(object):
                 self.config = json.load(f)
         else:
             self.config = {'channel_ids': []}
-
-        log.info('Anchored channels:')
-        for _id in self.getChannels():
-            channel = client.get_channel(_id)
-            log.info('+ ', channel.name, channel.id)
 
     def updateConfig(self, key: str, value):
         """
@@ -152,6 +156,18 @@ class BasicBot(object):
 
         return True
 
+    def getChannelList(self, channel=None):
+        """
+        Resovle a list of all channels to Channel objects, or the given channel in list format.
+        :param channel: destination channel
+        :return: a list of Channle objects
+        """
+        if channel is None:
+            channels = [self.client.get_channel(chid) for chid in self.getChannels()]
+        else:
+            channels = [channel]
+        return channels
+
     async def send(self, message: str, channel=None, embed=None):
         """
         Send a message through the client to all connected channels.
@@ -159,17 +175,15 @@ class BasicBot(object):
         :param embed: set the embed to use
         :param message: the message to send
         """
-        log.debug('send message: ' + message)
+        log.debug('send message: ' + str(message))
         log.debug('to channel:   ' + str(channel))
-        log.debug('with embed:   ' + str(channel))
+        log.debug('with embed:   ' + str(embed))
 
-        if channel is None:
-            for chid in self.getChannels():
-                log.debug('sending message to ' + str(chid))
-                await self.client.send_message(chid, message, embed=embed)
-        else:
-            log.debug('sending message to ' + str(channel))
-            await self.client.send_message(channel, message, embed=embed)
+        channels = self.getChannelList(channel)
+
+        for ch in channels:
+            log.debug('sending message to ' + str(ch))
+            await self.client.send_message(ch, message, embed=embed)
 
     async def login(self):
         """
@@ -178,6 +192,13 @@ class BasicBot(object):
         log.info('Logged in as')
         log.info(self.client.user.name)
         log.info(self.client.user.id)
+
+        self.user = self.client.user
+
+        log.info('Anchored channels:')
+        for _id in self.getChannels():
+            channel = self.client.get_channel(_id)
+            log.info('+ {} {}'.format(channel.name, channel.id))
 
     async def executeCommand(self, message: Message):
         """
@@ -200,18 +221,16 @@ class BasicBot(object):
         for command in self.commandsSync:
             log.debug('check command ' + str(command))
             response = command(message)
-            if response is not '':
+            if response:
                 log.info('command executed')
-                await self.send(response, message.channel)
                 return
 
         log.debug('check sync commands')
         for command in self.commandsAsync:
             log.debug('check command ' + str(command))
             response = await command(message)
-            if response is not '':
+            if response:
                 log.info('command executed')
-                await self.send(response, message.channel)
                 return
 
         if self.containsMention(message):

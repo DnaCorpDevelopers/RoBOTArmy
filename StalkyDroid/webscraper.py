@@ -4,6 +4,8 @@ import requests
 from bs4 import BeautifulSoup
 from random import randint
 
+from BasicBot.basic import log
+
 resourceDir = 'StalkyDroid/resources/'
 
 
@@ -89,7 +91,7 @@ class WebScraper(object):
         self.config = {}
         self.waiting = randint(10, 30)
 
-        print('current waiting: ', self.waiting)
+        log.info('current waiting: {}'.format(self.waiting))
 
         with open(resourceDir + 'urls.config') as f:
             content = [line.split('=', 1) for line in f.readlines()]
@@ -100,7 +102,7 @@ class WebScraper(object):
             self.config['members'] = [line.strip() for line in f.readlines()]
 
     async def scrapeIndex(self):
-        print(self.config)
+        log.info(self.config)
         content = await getRequest(
             self.config['URL_ROOT'] +
             self.config['URL_FORUM'] +
@@ -131,7 +133,7 @@ class WebScraper(object):
                 if name in self.config['members']:
                     post = parsePost(block)
 
-                    print('found post from ', name, post['id'])
+                    log.info('found post from {} {}'.format(name, post['id']))
 
                     post['author'] = name
                     post['link'] = (

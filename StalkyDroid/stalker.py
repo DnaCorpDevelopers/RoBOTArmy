@@ -1,13 +1,11 @@
 import asyncio
 import json
-import traceback
 from contextlib import suppress
 from datetime import datetime
-from pprint import pprint
 
 from discord import Client, Message, Embed
 
-from BasicBot.basic import BasicBot
+from BasicBot.basic import BasicBot, log
 from StalkyDroid.webscraper import WebScraper
 
 envConfig = 'StalkyDroid/resources/environment.config'
@@ -29,13 +27,13 @@ def buildEmbed(topic, post):
         _type = _field['type']
         _text = _field['text']
 
-        pprint(_type)
-        pprint(_text)
+        log.debug(_type)
+        log.debug(_text)
 
         if _type == 'genmed':
-            values.append('**' + _text + '**')
+            values.append('**{}**'.format(_text))
         if _type == 'quote':
-            values.append('_' + _text + '_')
+            values.append('_{}_'.format(_text))
         if _type == 'postbody':
             if '_________________' not in _text:
                 values.append(_text.replace('"', "'"))
@@ -77,11 +75,13 @@ class Stalker(BasicBot):
         self.time = 3600  # seconds, hardcoded min is 15
         self.is_started = False
         self._task = None
+        self.lastUpdate = None
 
         self.addCommand(self.commandStart, True)
         self.addCommand(self.commandStop, True)
-        self.addCommand(self.commandChangeFrequency)
-        self.addCommand(self.commandOrder66)
+        self.addCommand(self.commandChangeFrequency, True)
+        self.addCommand(self.commandOrder66, True)
+        self.addCommand(self.commandLastUpdate, True)
 
         with open(envChecked, 'r') as f:
             self.checked = json.load(f)
@@ -110,7 +110,7 @@ class Stalker(BasicBot):
 
         n = self.checked[topic['id']]['posts']
 
-        print('#{:8} +{:<4} {}'.format(topic['id'], (topic['posts'] - n), topic['title']))
+        log.info('#{:8} +{:<4} {}'.format(topic['id'], (topic['posts'] - n), topic['title']))
 
         return n - (n % 15)
 
@@ -145,7 +145,8 @@ class Stalker(BasicBot):
         """
         Update the disk file with all the configuration data for the checked list.
         """
-        print('update', str(datetime.now()))
+        self.lastUpdate = datetime.now()
+        log.info('update {}'.format(self.lastUpdate))
 
         with open(envChecked, 'w+') as f:
             json.dump(self.checked, f)
@@ -157,11 +158,12 @@ class Stalker(BasicBot):
         :return: a startup message, or an empty string if the command is invalid
         """
         if self.containsMention(msg) and 'start' in msg.content:
-            print('start!')
+            log.info('start!')
             await self.start()
-            return '_booting up sensors..._'
+            await self.send('_booting up sensors..._')
+            return True
 
-        return ''
+        return False
 
     async def commandStop(self, msg: Message):
         """
@@ -170,13 +172,14 @@ class Stalker(BasicBot):
         :return: a shutdown message, or an empty string if the command is invalid
         """
         if self.containsMention(msg) and 'stop' in msg.content:
-            print('stop!')
+            log.info('stop!')
             await self.stop()
-            return '_Sensors shutting down..._'
+            await self.send('_Sensors shutting down..._')
+            return True
 
-        return ''
+        return False
 
-    def commandChangeFrequency(self, msg: Message):
+    async def commandChangeFrequency(self, msg: Message):
         """
         Change the current update frequency. The input value is in seconds and has 900s (15min) as lower bound.
         No upper bound is defined. Default value is 3600.
@@ -189,24 +192,41 @@ class Stalker(BasicBot):
                 tokens = msg.content.split(' ')
                 time = int(tokens[len(tokens) - 1])
                 self.time = max(time, 900)
-                response = '_New frequency: ' + str(self.time) + '_'
+                response = '_New frequency {}_'.format(str(self.time))
+                log.info('new frequency: {}'.format(self.time))
             except ValueError:
                 response = '_Kzzzzzt! Invalid..._'
+                log.info('cannot parse number: {}'.format(msg.content))
 
-            return response
+            await self.send(response)
+            return True
 
-        return ''
+        return False
 
-    def commandOrder66(self, msg: Message):
+    async def commandOrder66(self, msg: Message):
         """
         Start the kill-all-jedi routine. Long live the Emperor!
         :param msg: must contain the keyword '66', and mention this bot.
         :return an easter egg message :)
         """
         if self.containsMention(msg) and '66' in msg.content:
-            return '_ :skull: KILL ALL THE JEDIS! :skull: _'
+            log.info("killing jedi...")
+            await self.send('_ :skull: KILL ALL THE JEDI! :skull: _')
+            return True
 
-        return ''
+        return False
+
+    async def commandLastUpdate(self, msg: Message):
+        """
+        Return the last time the bot checked the forum for news.
+        :param msg: must contain the keyword 'info', and mention this bot.
+        """
+        if self.containsMention(msg) and 'info':
+            log.info('last update done: {}'.format(self.lastUpdate))
+            await self.send('_Last update: {}_'.format(self.lastUpdate))
+            return True
+
+        return False
 
     async def webScraper(self):
         """
@@ -231,7 +251,7 @@ class Stalker(BasicBot):
                 for post in posts:
                     if self.checkPost(topic, post):
                         # already done
-                        print('post from {} #{} already done'.format(post['author'], post['id']))
+                        log.info('post from {} #{} already done'.format(post['author'], post['id']))
                         continue
 
                     # send all the messages!
@@ -243,13 +263,13 @@ class Stalker(BasicBot):
                         # register the posts
                         self.updateTopic(topic, post['id'])
                     except Exception as e:
-                        print(e)
-                        traceback.print_exc()
+                        log.error(e)
+                        # traceback.print_exc()
 
         except Exception as e:
             # if we have any kind of error with the remote site, call for help!
-            print(e)
-            traceback.print_exc()
+            log.error(e)
+            # traceback.print_exc()
             await self.send('@everyone _O-oh..._')
             await self.stop()
             return
@@ -261,8 +281,8 @@ class Stalker(BasicBot):
         Just a debug function that print the current date and time
         """
         now = datetime.now()
-        msg = '...check: ' + str(now) + '...'
-        print('sending: ', msg)
+        msg = '...check: {}...'.format(now)
+        log.info('sending: {}'.format(msg))
         await self.send(msg)
 
     async def start(self):
@@ -271,7 +291,7 @@ class Stalker(BasicBot):
         """
         if not self.is_started:
             self.is_started = True
-            print('starting...')
+            log.info('starting...')
             # start task to call function periodically
             self._task = asyncio.ensure_future(self._run())
 
@@ -280,7 +300,7 @@ class Stalker(BasicBot):
         Stop the execution, if it is running.
         """
         if self.is_started:
-            print('stopping...')
+            log.info('stopping...')
             self.is_started = False
             # stop task and await
             self._task.cancel()

@@ -4,8 +4,8 @@ import re
 from discord import Message, Client, User
 
 from BasicBot.basic import BasicBot, log
-from JoeTheBarman.languages.it.drinks import initialDrinkList
 from JoeTheBarman.languages.it.conversations import *
+from JoeTheBarman.languages.it.drinks import initialDrinkList
 
 envConfig = 'JoeTheBarman/resources/environment.config'
 
@@ -21,7 +21,7 @@ class Barman(BasicBot):
 
         self.customers = set()
 
-        self.addCommand(self.serveDrinks)
+        self.addCommand(self.commandServeDrinks, True)
 
     def addDrink(self, drink):
         self.drinks[drink.lower()] = drink
@@ -36,9 +36,20 @@ class Barman(BasicBot):
         # must contain 'joe' or 'barman' or be in the watching list
         return any(x in content for x in names) or message.author in self.customers
 
+    async def commandServeDrinks(self, message: Message):
+        response, img = self.serveDrinks(message)
+
+        if response is not None:
+            await self.send(response, message.channel)
+            if img is not None:
+                await self.client.send_file(message.channel, img)
+            return True
+
+        return False
+
     def serveDrinks(self, message: Message):
         if not self.checkCall(message):
-            return
+            return None, None
 
         mentions = message.mentions
 
@@ -78,12 +89,13 @@ class Barman(BasicBot):
         if 'tutti' in tokens or message.mention_everyone:
             # if it is for @everyone or contains a special token
             log.info('send offer to everyone')
-            return '@everyone il prossimo giro di {2} lo offre {1} {0}!' \
-                       .format(mention, title, foundDrink['name']), foundDrink['img']
+            return '@everyone il prossimo giro di {2} lo offre {1} {0}!'.format(
+                mention, title, foundDrink['name']
+            ), foundDrink['img']
 
         if len(mentions) > 0:
             # if we have mentions, notify to them
-            log.info('offer to user' )
+            log.info('offer to user')
             intro = ', '.join([str(m.mention) for m in mentions]) \
                     + ' ' + str(mention) + ' vi offre'
         else:
@@ -94,9 +106,9 @@ class Barman(BasicBot):
         drink = random.choice(drinkings).format(foundDrink['name'])
         conclusion = random.choice(conclusions)
 
-        log.info('')
+        log.info('sending drink')
         return intro + ' ' + drink + ' ' + conclusion, foundDrink['img']
 
     async def login(self):
         await super().login()
-        await self.send(random.choice(greetings)())
+        await self.send(random.choice(greetings))
