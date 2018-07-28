@@ -3,7 +3,7 @@ import re
 
 from discord import Message, Client, User
 
-from BasicBot.basic import BasicBot
+from BasicBot.basic import BasicBot, log
 from JoeTheBarman.languages.it.drinks import initialDrinkList
 from JoeTheBarman.languages.it.conversations import *
 
@@ -46,7 +46,7 @@ class Barman(BasicBot):
         clean = re.sub('[^A-Za-z0-9 ]+', '', content.lower())
         tokens = clean.split(' ')
 
-        print(tokens)
+        log.debug('tokens: ' + str(tokens))
 
         # search for any kind of drink
         foundDrinks = [d for d in self.drinks if d['key'] in clean]
@@ -54,18 +54,22 @@ class Barman(BasicBot):
         title = random.choice(titles)
 
         if len(tokens) == 1 and len(foundDrinks) == 0:
+            log.info('send generic order request')
             return random.choice(orders).format(message.author.mention), None
 
         if 'grazie' in tokens:
             # get a random thank string
+            log.info('send thanks')
             return random.choice(thanks).format(title), None
 
         if 'drinks' in tokens:
             # return the list of drinks
+            log.info('send drink list')
             return 'Abbiamo ' + ', '.join([d['name'] for d in self.drinks]), None
 
         if len(foundDrinks) < 1:
             # if we haven't found a valid drink
+            log.info('send not found')
             return random.choice(notFound), None
 
         # we have found a drink!
@@ -73,20 +77,24 @@ class Barman(BasicBot):
 
         if 'tutti' in tokens or message.mention_everyone:
             # if it is for @everyone or contains a special token
+            log.info('send offer to everyone')
             return '@everyone il prossimo giro di {2} lo offre {1} {0}!' \
                        .format(mention, title, foundDrink['name']), foundDrink['img']
 
         if len(mentions) > 0:
             # if we have mentions, notify to them
+            log.info('offer to user' )
             intro = ', '.join([str(m.mention) for m in mentions]) \
                     + ' ' + str(mention) + ' vi offre'
         else:
             # just answer the client
+            log.info('answer the client')
             intro = random.choice(incipits).format(mention)
 
         drink = random.choice(drinkings).format(foundDrink['name'])
         conclusion = random.choice(conclusions)
 
+        log.info('')
         return intro + ' ' + drink + ' ' + conclusion, foundDrink['img']
 
     async def login(self):

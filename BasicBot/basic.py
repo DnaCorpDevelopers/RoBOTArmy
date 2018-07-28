@@ -1,7 +1,11 @@
 import json
 import os
+import logging
 
 from discord import Client, Message
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s : %(levelname)s : %(message)s')
+log = logging.getLogger('BasicBot')
 
 
 class BasicBot(object):
@@ -22,10 +26,10 @@ class BasicBot(object):
         else:
             self.config = {'channel_ids': []}
 
-        print('Anchored channels:')
+        log.info('Anchored channels:')
         for _id in self.getChannels():
             channel = client.get_channel(_id)
-            print('+ ', channel.name, channel.id)
+            log.info('+ ', channel.name, channel.id)
 
     def updateConfig(self, key: str, value):
         """
@@ -38,6 +42,7 @@ class BasicBot(object):
 
         with open(self.env, 'w') as f:
             json.dump(self.config, f)
+            log.info('Config updated, file written to ' + self.env)
 
     def getChannels(self):
         """
@@ -97,7 +102,7 @@ class BasicBot(object):
         if self.containsMention(message) and 'anchor' in content:
             self.addChannel(channel.id)
 
-            print('Anchored to ' + str(channel))
+            log.info('Anchored to ' + str(channel))
             return '_Anchored to_ #' + channel.name
 
         return ''
@@ -114,7 +119,7 @@ class BasicBot(object):
         if self.containsMention(message) and 'leave' in content:
             self.removeChannel(channel.id)
 
-            print('Leaving ' + str(channel))
+            log.info('Leaving ' + str(channel))
             return '_Bye!_'
 
         return ''
@@ -128,8 +133,11 @@ class BasicBot(object):
         :param message: input message
         :return: True if the message is for this bot, otherwise False
         """
+        log.debug('checking message ' + str(message))
+
         # avoid self messages
         if message.author == self.user:
+            log.debug('avoid answer message from self')
             return False
 
         # if we have a channel
@@ -137,7 +145,10 @@ class BasicBot(object):
         if len(channels) > 0:
             # avoid messages from not registered channels
             if message.channel.id not in channels:
+                log.debug('message is not from anchored channel')
                 return False
+
+        log.debug('message is valid')
 
         return True
 
@@ -145,18 +156,28 @@ class BasicBot(object):
         """
         Send a message through the client to all connected channels.
         :param channel: specify the destination channel. If None, it will be sent to all anchored channels
+        :param embed: set the embed to use
         :param message: the message to send
         """
+        log.debug('send message: ' + message)
+        log.debug('to channel:   ' + str(channel))
+        log.debug('with embed:   ' + str(channel))
+
         if channel is None:
             for chid in self.getChannels():
+                log.debug('sending message to ' + str(chid))
                 await self.client.send_message(chid, message, embed=embed)
         else:
+            log.debug('sending message to ' + str(channel))
             await self.client.send_message(channel, message, embed=embed)
 
     async def login(self):
-        print('Logged in as')
-        print(self.client.user.name)
-        print(self.client.user.id)
+        """
+        Perform basic login stuff.
+        """
+        log.info('Logged in as')
+        log.info(self.client.user.name)
+        log.info(self.client.user.id)
 
     async def executeCommand(self, message: Message):
         """
@@ -169,20 +190,30 @@ class BasicBot(object):
         :return: an answer in bot-language :D
         """
 
+        log.debug('received message ' + str(message))
+
         if not self.checkMessage(message):
+            log.debug('message check FAILED')
             return
 
+        log.debug('check async commands')
         for command in self.commandsSync:
+            log.debug('check command ' + str(command))
             response = command(message)
             if response is not '':
+                log.info('command executed')
                 await self.send(response, message.channel)
                 return
 
+        log.debug('check sync commands')
         for command in self.commandsAsync:
+            log.debug('check command ' + str(command))
             response = await command(message)
             if response is not '':
+                log.info('command executed')
                 await self.send(response, message.channel)
                 return
 
         if self.containsMention(message):
+            log.debug('no command executed')
             await self.send('_...bip bip bip..._', message.channel)
