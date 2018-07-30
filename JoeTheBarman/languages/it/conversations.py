@@ -60,7 +60,7 @@ conclusions = [
 notFound = [
     'Purtroppo è finito!',
     'Qui non serviamo quella robaccia...',
-    'L\'ultima bottiglia è finita ier.',
+    'L\'ultima bottiglia è finita ieri.',
     'I trasporti sono in ritardo, ci vorrà un po\' prima che arrivi nuova merce',
     'Finito...',
     'Arriva martedì',

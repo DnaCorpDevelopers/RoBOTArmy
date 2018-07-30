@@ -6,4 +6,5 @@ initialDrinkList = [
     {'key': 'whiskey', 'name': 'Space Whiskey', 'img': 'JoeTheBarman/images/whiskey.jpg'},
     {'key': 'patate', 'name': 'Succo di patate', 'img': 'JoeTheBarman/images/potato.jpg'},
     {'key': 'birra', 'name': 'Birra del Bucaniere', 'img': 'JoeTheBarman/images/beer.jpg'},
+    {'key': 'latte e biscotti', 'name': 'Latte e Biscotti', 'img': 'JoeTheBarman/images/cookies-milk.jpg'}
 ]
