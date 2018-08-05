@@ -1,5 +1,6 @@
 import random
 import re
+import string
 
 from discord import Message, Client, User
 
@@ -55,13 +56,13 @@ class Barman(BasicBot):
         mentions = message.mentions
 
         content = message.content
-        clean = re.sub('[^A-Za-z0-9 ]+', '', content.lower())
+        clean = re.sub('[^A-Za-z0-9 ]+', ' ', content.lower())
         tokens = clean.split(' ')
 
         log.debug('tokens: ' + str(tokens))
 
         # search for any kind of drink
-        foundDrinks = [d for d in self.drinks if d['key'] in tokens]
+        foundDrinks = [d for d in self.drinks if len(set(tokens).intersection(d['key'])) == len(d['key'])]
         mention = message.author.mention
         title = random.choice(titles)
 
@@ -69,7 +70,7 @@ class Barman(BasicBot):
             log.info('send generic order request')
             return random.choice(orders).format(message.author.mention), None
 
-        if len([a for a in thankAnswer if a in tokens]) > 0:
+        if len([a for a in thankAnswer if a in tokens]) > 0 and len(foundDrinks) == 0:
             # get a random thank string
             log.info('send thanks')
             return random.choice(thanks).format(title), None
