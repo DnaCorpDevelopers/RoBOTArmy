@@ -33,10 +33,11 @@ def topicInfo(topic: BeautifulSoup):
     :param topic: input code block
     :return: a dictionary composed by id and title of the topic
     """
+    m = re.search('.*t=(\d*).*', topic['href'])
     return {
-        'id': topic['href'].split('=')[1],
+        'id': m.group(1),
         'title': topic.getText(),
-        'posts': int(topic.parent.parent.parent.find('span', {'class', 'postdetails'}).getText())
+        'posts': topic.parent.parent.parent.find('dd', {'class', 'posts'}).getText().split(' ', 1)[0]
     }
 
 
@@ -46,21 +47,20 @@ def parsePost(block: BeautifulSoup):
     :param block: input code block
     :return: an dictionary representing a post
     """
-    post = block.parent.parent
-    postId = [a for a in post.findAll('a') if a.has_attr('name')][0]['name']
+    post = block.parent
+    postId = post['id'][12:]
 
-    postBody = post.find_all(['span', 'td'], {'class': ['postbody', 'genmed', 'quote']})
-    postDetails = post.find_all('span', {'class': 'postdetails'})
-
-    publicationDate = re.findall('Posted: (.+)Post subject:.*', postDetails[1].getText())[0]
+    postBody = post.find('div', {'class': 'content'})
+    publicationDate = re.findall('» (.*)', post.find('p', {'class': 'author'}).getText().strip())[0]
 
     chunks = []
 
-    for pb in postBody:
-        text = pb.getText().strip()
-        if text == '':
+    for pb in postBody.children:
+        if str(pb) == '':
             continue
 
+        text = pb.getText().strip()
+        # TODO
         chunk = {
             'type': pb.attrs['class'][0],
             'text': re.sub('\n+', '\n', text),
@@ -126,10 +126,11 @@ class WebScraper(object):
             )
 
             if 'General Error' in content.getText():
+                # TODO: this check is no more valid!
                 break
 
-            for block in content.findAll('span', {'class': 'name'}):
-                name = block.getText().strip()
+            for block in content.findAll('p', {'class': 'author'}):
+                name = block.find('strong').getText().strip()
                 if name in self.config['members']:
                     post = parsePost(block)
 
