@@ -144,11 +144,17 @@ class WebScraper(object):
             content = await getRequest(
                 self.config['URL_ROOT'] +
                 self.config['URL_TOPIC'] +
-                topic['id'] + "&start=" + str(start)
+                # TODO topic['id'] + "&start=" + str(start)
+                "399750&start=0"
             )
 
             for block in content.findAll('p', {'class': 'author'}):
-                name = block.find('strong').getText().strip()
+                x = block.find('strong')
+
+                if x is None:
+                    continue
+
+                name = x.getText().strip()
                 if name in self.config['members']:
                     post = parsePost(block)
 
@@ -158,7 +164,7 @@ class WebScraper(object):
                     post['link'] = (
                         self.config['URL_ROOT'] +
                         self.config['URL_POST'] +
-                        post['id'] + "#" + post['id']
+                        post['id'] + "#p" + post['id']
                     )
 
                     posts.append(post)
