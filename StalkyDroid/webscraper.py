@@ -37,7 +37,7 @@ def topicInfo(topic: BeautifulSoup):
     return {
         'id': m.group(1),
         'title': topic.getText(),
-        'posts': topic.parent.parent.parent.find('dd', {'class', 'posts'}).getText().split(' ', 1)[0]
+        'posts': int(topic.parent.parent.parent.find('dd', {'class', 'posts'}).getText().split(' ', 1)[0])
     }
 
 
@@ -54,27 +54,49 @@ def parsePost(block: BeautifulSoup):
     publicationDate = re.findall('» (.*)', post.find('p', {'class': 'author'}).getText().strip())[0]
 
     chunks = []
+    last = None
 
     for pb in postBody.children:
-        if str(pb) == '':
+        if str(pb).strip() in ['', '<br/>']:
             continue
 
-        text = pb.getText().strip()
-        # TODO
-        chunk = {
-            'type': pb.attrs['class'][0],
-            'text': re.sub('\n+', '\n', text),
-            'images': [],
-            'links': []
-        }
+        add = True
 
-        for img in pb.findAll('img'):
-            chunk['images'].append(img['src'])
+        isQuote = None
+        try:
+            isQuote = pb.findAll('cite')
+        except AttributeError:
+            pass
 
-        for a in pb.findAll('a', {'class': 'postlink'}):
-            chunk['links'].append(a['href'])
+        if isQuote:
+            chunk = {
+                'type': 'quote',
+                'text': re.sub('\n+', '\n', pb.getText()),
+                # 'images': [],
+                # 'links': []
+            }
+        elif last and last['type'] == 'text':
+            chunk = last
+            chunk['text'] += re.sub('\n+', '\n', str(pb))
+            add = False
+        else:
+            chunk = {
+                'type': 'text',
+                'text': re.sub('\n+', '\n', str(pb)),
+                # 'images': [],
+                # 'links': []
+            }
 
-        chunks.append(chunk)
+        # for img in pb.findAll('img'):
+        #     if 'smiles' not in img['src']:
+        #         chunk['images'].append(img['src'])
+        #
+        # for a in pb.findAll('a', {'class': 'postlink'}):
+        #     chunk['links'].append(a)
+
+        last = chunk
+        if add:
+            chunks.append(chunk)
 
     return {
         'id': postId,
@@ -118,16 +140,12 @@ class WebScraper(object):
 
         posts = []
 
-        for start in range(page, 300, 15):
+        for start in range(page, topic['posts'] + 1, 15):
             content = await getRequest(
                 self.config['URL_ROOT'] +
                 self.config['URL_TOPIC'] +
                 topic['id'] + "&start=" + str(start)
             )
-
-            if 'General Error' in content.getText():
-                # TODO: this check is no more valid!
-                break
 
             for block in content.findAll('p', {'class': 'author'}):
                 name = block.find('strong').getText().strip()

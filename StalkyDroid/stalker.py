@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 from contextlib import suppress
 from datetime import datetime
 
@@ -30,13 +31,13 @@ def buildEmbed(topic, post):
         log.debug(_type)
         log.debug(_text)
 
-        if _type == 'genmed':
-            values.append('**{}**'.format(_text))
         if _type == 'quote':
-            values.append('_{}_'.format(_text))
-        if _type == 'postbody':
-            if '_________________' not in _text:
-                values.append(_text.replace('"', "'"))
+            cs = _text.split(' wrote:')
+
+            values.append('**{} wrote:**\n{}'.format(cs[0], cs[1]))
+
+        if _type == 'text':
+            values.append(_text.replace('"', "'"))
 
     fullText = "\n".join(values)
 
