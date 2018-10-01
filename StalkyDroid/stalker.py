@@ -1,6 +1,5 @@
 import asyncio
 import json
-import re
 from contextlib import suppress
 from datetime import datetime
 
@@ -73,7 +72,7 @@ class Stalker(BasicBot):
         super().__init__(client, envConfig)
 
         # async config
-        self.time = 3600  # seconds, hardcoded min is 15
+        self.time = 1800  # seconds, hardcoded min is 15
         self.is_started = False
         self._task = None
         self.lastUpdate = None

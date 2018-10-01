@@ -1,7 +1,7 @@
 import asyncio
 import re
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 from random import randint
 
 from BasicBot.basic import log
@@ -68,31 +68,27 @@ def parsePost(block: BeautifulSoup):
         except AttributeError:
             pass
 
-        if isQuote:
+        if isinstance(pb, NavigableString):
+            _text = str(pb)
+        else:
+            _text = pb.getText()
+
+        if isQuote and len(isQuote) > 0:
             chunk = {
                 'type': 'quote',
-                'text': re.sub('\n+', '\n', pb.getText()),
-                # 'images': [],
-                # 'links': []
+                'text': re.sub('\n+', '\n', _text),
             }
+
         elif last and last['type'] == 'text':
             chunk = last
-            chunk['text'] += re.sub('\n+', '\n', str(pb))
+            chunk['text'] += ' ' + re.sub('\n+', '\n', _text)
             add = False
+
         else:
             chunk = {
                 'type': 'text',
-                'text': re.sub('\n+', '\n', str(pb)),
-                # 'images': [],
-                # 'links': []
+                'text': re.sub('\n+', '\n', _text),
             }
-
-        # for img in pb.findAll('img'):
-        #     if 'smiles' not in img['src']:
-        #         chunk['images'].append(img['src'])
-        #
-        # for a in pb.findAll('a', {'class': 'postlink'}):
-        #     chunk['links'].append(a)
 
         last = chunk
         if add:
@@ -144,8 +140,7 @@ class WebScraper(object):
             content = await getRequest(
                 self.config['URL_ROOT'] +
                 self.config['URL_TOPIC'] +
-                # TODO topic['id'] + "&start=" + str(start)
-                "399750&start=0"
+                topic['id'] + "&start=" + str(start)
             )
 
             for block in content.findAll('p', {'class': 'author'}):
