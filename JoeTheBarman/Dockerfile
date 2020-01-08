@@ -12,11 +12,13 @@ FROM python:3.7-slim-buster AS base
 COPY --from=builder /install /usr/local/lib/python3.7/site-packages
 
 RUN useradd --create-home bot
+USER bot
+
 WORKDIR /home/bot
+
+ENV PYTHONPATH "${PYTHONPATH}:/home/bot"
 
 COPY commons /home/bot/commons
 COPY JoeTheBarman /home/bot/JoeTheBarman
 
-USER bot
-
-CMD ["python", "JoeTheBarman/bot.py"]
+ CMD ["python", "JoeTheBarman/bot.py"] 
