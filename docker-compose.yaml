@@ -1,0 +1,20 @@
+version: '3.7'
+
+network:
+  bot-army-network
+
+services:
+
+  bot-army-barman:
+    build:
+      context: ./
+      dockerfile: JoeTheBarman/Dockerfile
+    image: bot.army.barman
+    container_name: bot-army-barman
+    restart: unless-stopped
+    env_file:
+      # this is an external file
+      - JoeTheBarman/.env
+    networks:
+      - bot-army-network
+

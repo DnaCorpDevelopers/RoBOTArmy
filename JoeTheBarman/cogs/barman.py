@@ -8,12 +8,13 @@ import discord
 from discord import Message
 from discord.ext import commands
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s : %(levelname)s : %(message)s')
-log = logging.getLogger('BasicBot')
+log = logging.getLogger(__name__)
 
 images_dir = os.getenv('STORAGE_IMAGES')
 drinks_file = os.path.join(os.getenv('STORAGE_LANGUAGES'), 'drinks.it.json')
 convs_file = os.path.join(os.getenv('STORAGE_LANGUAGES'), 'conversations.it.json')
+
+CHANNEL: str = os.getenv('DISCORD_CHANNEL')
 
 
 class Drink:
@@ -33,15 +34,15 @@ class Drink:
 
 def load_drinks():
     file_list = json.load(open(drinks_file, 'r', encoding='utf-8'))
-    drink_map = {}
-    drink_list = []
+    d_map = {}
+    d_list = []
     for d in file_list:
         drink = Drink(d)
-        drink_list.append(drink)
+        d_list.append(drink)
         for k in drink.keys:
-            drink_map[k] = drink
+            d_map[k] = drink
 
-    return drink_list, drink_map
+    return d_list, d_map
 
 
 drink_list, drink_map = load_drinks()
@@ -137,6 +138,9 @@ class Barman(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: Message):
         if message.author == self.bot.user:
+            return
+
+        if message.channel.name != CHANNEL:
             return
 
         if not self._checkCall(message):

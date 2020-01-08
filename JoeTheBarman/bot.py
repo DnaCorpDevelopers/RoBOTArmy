@@ -1,12 +1,15 @@
 # bot.py
+import logging
 import os
 
 import discord
 
-from dotenv import load_dotenv
 from discord.ext import commands
+from commons.utils import setup_logging
 
-load_dotenv()
+setup_logging()
+log = logging.getLogger(__name__)
+
 BASE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 os.environ['STORAGE_LANGUAGES'] = os.path.join(BASE_DIR, 'storage', 'languages')
@@ -14,11 +17,10 @@ os.environ['STORAGE_IMAGES'] = os.path.join(BASE_DIR, 'storage', 'images')
 
 TOKEN: str = os.getenv('DISCORD_TOKEN')
 GUILD: str = os.getenv('DISCORD_GUILD')
-CHANNEL: str = os.getenv('DISCORD_CHANNEL')
 
 bot = commands.Bot(command_prefix='$', description='Just a Barman')
 
-initial_extensions = ['cogs.manage', 'cogs.barman']
+initial_extensions = ['commons.cogs.manage', 'JoeTheBarman.cogs.barman']
 
 if __name__ == '__main__':
     for extension in initial_extensions:
@@ -31,13 +33,10 @@ async def on_ready():
 
     guild: discord.Guild = discord.utils.get(bot.guilds, name=GUILD)
 
-    print(
+    log.info(
         f'{bot.user} is connected to the following guild:\n'
         f'{guild.name}(id: {guild.id})'
     )
-
-    members = '\n - '.join([member.name for member in guild.members])
-    print(f'Guild Members:\n - {members}')
 
 
 bot.run(TOKEN, bot=True, reconnect=True)
